@@ -13,7 +13,7 @@ fn main() {
         .about("Github CODEOWNERS answer sheet")
         .arg(
             Arg::with_name("codeowners")
-                .help("sets an explicit path for a CODEOWNERS file. program will exit 1 if file can not be resolved")
+                .help("an explicit path for a CODEOWNERS file. program will exit 1 if file can not be resolved")
                 .takes_value(true)
                 .short("c")
                 .long("codeowners"),
