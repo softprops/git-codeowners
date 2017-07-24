@@ -2,6 +2,9 @@
 
 > a git extention for Github [CODEOWNERS files](https://help.github.com/articles/about-codeowners/)
 
+Github `CODEOWNERS` files document ownership over paths within git repositories allowing
+you to more effectively focus communication with the right people.
+
 ## install
 
 ### Homebrew
