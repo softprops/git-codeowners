@@ -1,6 +1,8 @@
 # git-codeowners [![Build Status](https://travis-ci.org/softprops/git-codeowners.svg?branch=master)](https://travis-ci.org/softprops/git-codeowners)
 
-# usage
+> a git extention for Github [CODEOWNERS files](https://help.github.com/articles/about-codeowners/)
+
+## usage
 
 git-codeowners is intended for use as a git extention ( a program whose name starts with git- ) to extend your git workflow.
 
