@@ -13,14 +13,14 @@ fn main() {
         .about("Github CODEOWNERS answer sheet")
         .arg(
             Arg::with_name("codeowners")
-                .help("an explicit path for a CODEOWNERS file. program will exit 1 if file can not be resolved")
+                .help("An explicit path for a CODEOWNERS file. program will exit 1 if file can not be resolved")
                 .takes_value(true)
                 .short("c")
                 .long("codeowners"),
         )
         .arg(
             Arg::with_name("teams")
-                .help("only return teams")
+                .help("Only return teams")
                 .short("t")
                 .long("teams")
                 .conflicts_with("users")
@@ -28,7 +28,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("users")
-                .help("only return users")
+                .help("Only return users")
                 .short("u")
                 .long("users")
                 .conflicts_with("teams")
@@ -36,7 +36,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("emails")
-                .help("only return emails")
+                .help("Only return emails")
                 .short("e")
                 .long("emails")
                 .conflicts_with("teams")
@@ -45,7 +45,7 @@ fn main() {
         .arg(
             Arg::with_name("path")
                 .help(
-                    "path of file in git repo. if '-' is provided path will \
+                    "Path of file in git repo. if '-' is provided path will \
                      be read from stdin. program will exit 2 if no owners can \
                      be resolved",
                 )
