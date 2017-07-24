@@ -1,4 +1,4 @@
-# git-codeowners [![Build Status](https://travis-ci.org/softprops/git-codeowners.svg?branch=master)](https://travis-ci.org/softprops/git-codeowners) [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE) [![crates.io](https://img.shields.io/crates/v/codeowners.svg)]
+# git-codeowners [![Build Status](https://travis-ci.org/softprops/git-codeowners.svg?branch=master)](https://travis-ci.org/softprops/git-codeowners) [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg)](LICENSE) [![Crates.io](https://img.shields.io/crates/v/git-codeowners.svg)]()
 
 > a git extention for Github [CODEOWNERS files](https://help.github.com/articles/about-codeowners/)
 
