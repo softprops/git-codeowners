@@ -1,6 +1,6 @@
 [package]
 name = "git-codeowners"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["softprops <d.tangren@gmail.com>"]
 description = "Rust cli for working with Github CODEOWNERS files"
 readme = "README.md"
@@ -11,5 +11,5 @@ license = "MIT"
 keywords = ["github", "owners"]
 
 [dependencies]
-codeowners = "0.1.1"
-clap = "2.25"
+codeowners = "0.1.3"
+clap = "2.27"
