@@ -23,7 +23,7 @@ You can download releases for osx and linux directly from github releases
 
 ```bash
 $ cd $HOME/bin
-$ curl -L "https://github.com/softprops/git-codeowners/releases/download/v0.1.1/git-codeowners-$(uname -s)-$(uname -m).tar.gz" \
+$ curl -L "https://github.com/softprops/git-codeowners/releases/download/v0.1.2/git-codeowners-$(uname -s)-$(uname -m).tar.gz" \
   | tar -xz
 ```
 
@@ -46,7 +46,7 @@ $ git codeowners src/main.rs
 
 ```bash
 $ git-codeowners --help
-git-codeowners 0.1.1
+git-codeowners 0.1.2
 Github CODEOWNERS answer sheet
 
 USAGE:
