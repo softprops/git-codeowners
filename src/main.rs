@@ -1,9 +1,13 @@
 extern crate codeowners;
 extern crate clap;
+extern crate git2;
 
 use codeowners::Owner;
 use clap::{App, Arg};
+use git2::Repository;
+use std::env::current_dir;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::exit;
 use std::io::{self, BufRead};
 
@@ -62,8 +66,17 @@ fn main() {
                 None
             }
         }
-        _ => codeowners::locate("."),
+        None => match discover_codeowners() {
+            Some(path) => Some(path),
+            None => {
+                println!("No CODEOWNERS file found in this repo.");
+                println!("Ensure one exists at any of the locations documented here:");
+                println!("https://help.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners#codeowners-file-location");
+                exit(1)
+            }
+        }
     };
+
     match ownersfile {
         Some(file) => {
             let resolve = |path: &str| {
@@ -118,4 +131,18 @@ fn main() {
         _ => exit(1),
     }
 
+}
+
+fn discover_codeowners() -> Option<PathBuf> {
+    let curr_dir = current_dir().unwrap();
+    let repo = match Repository::discover(&curr_dir) {
+        Ok(r) => r,
+        Err(e) => {
+            println!("Repo discovery failed. Is {} within a git repository? Error: {}", curr_dir.display(), e);
+            exit(1)
+        },
+    };
+
+    let repo_root = repo.workdir().unwrap();
+    codeowners::locate(&repo_root)
 }
