@@ -7,11 +7,18 @@ use std::io::{self, BufRead};
 use std::path::Path;
 use std::path::PathBuf;
 
+type ExitError = (Option<String>, i32);
+
 fn main() {
-    std::process::exit(run())
+    if let Err((msg, code)) = run() {
+        if let Some(msg) = msg {
+            eprintln!("{}", msg);
+        }
+        std::process::exit(code)
+    }
 }
 
-fn run() -> i32 {
+fn run() -> Result<(), ExitError> {
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about("Github CODEOWNERS answer sheet")
@@ -62,19 +69,15 @@ fn run() -> i32 {
         Some(path) => {
             let p = Path::new(path);
             if !p.exists() {
-                return 1;
+                return Err((Some(format!("specified file does not exist: {:?}", p)), 1));
             }
             p.to_path_buf()
         }
-        None => match discover_codeowners() {
-            Some(path) => path,
-            None => {
-                println!("No CODEOWNERS file found in this repo.");
-                println!("Ensure one exists at any of the locations documented here:");
-                println!("https://help.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners#codeowners-file-location");
-                return 1;
-            }
-        },
+        None => discover_codeowners().ok_or_else(|| (Some(format!(concat!(
+        "No CODEOWNERS file found in this repo.\n",
+            "Ensure one exists at any of the locations documented here:\n",
+            "https://help.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners#codeowners-file-location\n",
+        ))), 1))?,
     };
 
     let owners = codeowners::from_path(ownersfile);
@@ -84,18 +87,18 @@ fn run() -> i32 {
             let stdin = io::stdin();
             for path in stdin.lock().lines().filter_map(Result::ok) {
                 if !resolve(&owners, &matches, &path) {
-                    return 2;
+                    return Err((None, 2));
                 }
             }
         }
         path => {
             if !resolve(&owners, &matches, path) {
-                return 2;
+                return Err((None, 2));
             }
         }
     }
 
-    0
+    Ok(())
 }
 
 fn resolve(owners: &Owners, matches: &ArgMatches, path: &str) -> bool {
