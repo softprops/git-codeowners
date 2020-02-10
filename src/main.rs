@@ -1,14 +1,15 @@
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, SubCommand};
 use codeowners::Owner;
 use codeowners::Owners;
 use git2::{Error, Repository};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env::current_dir;
 use std::io::{self, BufRead};
 use std::path::Path;
 use std::path::PathBuf;
 
 type ExitError = (Option<String>, i32);
+type Settings = (bool, bool, bool);
 
 fn main() {
     if let Err((msg, code)) = run() {
@@ -96,18 +97,24 @@ fn run() -> Result<(), ExitError> {
 
     let owners = codeowners::from_path(ownersfile);
 
+    let settings = (
+        matches.is_present("teams"),
+        matches.is_present("users"),
+        matches.is_present("emails"),
+    );
+
     match matches.subcommand() {
         ("path", Some(matches)) => match matches.value_of("path").unwrap().as_ref() {
             "-" => {
                 let stdin = io::stdin();
                 for path in stdin.lock().lines().filter_map(Result::ok) {
-                    if !resolve(&owners, &matches, &path) {
+                    if !resolve(&owners, settings, &path) {
                         return Err((None, 2));
                     }
                 }
             }
             path => {
-                if !resolve(&owners, &matches, path) {
+                if !resolve(&owners, settings, path) {
                     return Err((None, 2));
                 }
             }
@@ -115,7 +122,8 @@ fn run() -> Result<(), ExitError> {
         ("log", Some(matches)) => {
             let repo = Repository::discover(".").expect("dir");
             for revspec in matches.values_of("revspec").expect("required") {
-                print_for_revspec(&repo, revspec).map_err(|e| (Some(format!("{:?}", e)), 1))?;
+                print_for_revspec(&repo, &owners, settings, revspec)
+                    .map_err(|e| (Some(format!("{:?}", e)), 1))?;
             }
         }
         (_, _) => unreachable!("invalid subcommand"),
@@ -124,17 +132,13 @@ fn run() -> Result<(), ExitError> {
     Ok(())
 }
 
-fn resolve(owners: &Owners, matches: &ArgMatches, path: &str) -> bool {
-    let (teams, users, emails) = (
-        matches.occurrences_of("teams") > 0,
-        matches.occurrences_of("users") > 0,
-        matches.occurrences_of("emails") > 0,
-    );
+fn find_owners<P: AsRef<Path>>(owners: &Owners, settings: Settings, path: P) -> Vec<String> {
+    let (teams, users, emails) = settings;
     let owners = match owners.of(path) {
         Some(owners) => owners,
-        None => return false,
+        None => return Vec::new(),
     };
-    let owned = owners
+    owners
         .iter()
         .filter_map(|owner| {
             if teams {
@@ -156,7 +160,11 @@ fn resolve(owners: &Owners, matches: &ArgMatches, path: &str) -> bool {
                 Some(owner.to_string())
             }
         })
-        .collect::<Vec<_>>();
+        .collect()
+}
+
+fn resolve(owners: &Owners, settings: Settings, path: &str) -> bool {
+    let owned = find_owners(owners, settings, path);
 
     if owned.is_empty() {
         return false;
@@ -192,9 +200,26 @@ fn discover_codeowners() -> Option<PathBuf> {
     codeowners::locate(&curr_dir)
 }
 
-fn print_for_revspec(repo: &git2::Repository, revspec: &str) -> Result<(), Error> {
+#[derive(Default, Debug)]
+struct Stats {
+    files: u64,
+    commits: u64,
+    example: String,
+}
+
+fn print_for_revspec(
+    repo: &git2::Repository,
+    owners: &Owners,
+    settings: Settings,
+    revspec: &str,
+) -> Result<(), Error> {
     let mut revwalk = repo.revwalk()?;
     revwalk.push_range(revspec)?;
+
+    let mut summary = HashMap::with_capacity(2);
+
+    let mut unowned = Stats::default();
+
     while let Some(commit) = revwalk.next() {
         let commit = commit?;
         let commit = repo.find_commit(commit).expect("commit");
@@ -215,7 +240,77 @@ fn print_for_revspec(repo: &git2::Repository, revspec: &str) -> Result<(), Error
                 files.insert(path.to_path_buf());
             }
         }
-        println!("{:?} touched files: {:?}", commit.id(), files);
+
+        let hash = &format!("{}", commit.id())[..6];
+        let first_line = commit
+            .message()
+            .unwrap_or("")
+            .split("\n")
+            .next()
+            .unwrap_or("");
+
+        let commit = format!("{} {}", hash, first_line);
+
+        if files.is_empty() {
+            println!("{}", commit);
+            continue;
+        }
+
+        println!("{}", commit);
+
+        // repo.branches(None)?.next().unwrap().unwrap().0.get().peel_to_commit()
+
+        let mut files = files.into_iter().collect::<Vec<_>>();
+        files.sort();
+
+        let mut commit_owners = HashSet::with_capacity(files.len());
+
+        for file in files {
+            let owners = find_owners(owners, settings, &file);
+            println!(" * {:?} {}", file, owners.join(" "));
+            commit_owners.extend(owners.iter().cloned());
+
+            if owners.is_empty() {
+                unowned.files += 1;
+                if unowned.example.is_empty() {
+                    unowned.example = format!("{:?} in {}", file, commit);
+                }
+            }
+
+            for owner in owners {
+                let stats = summary.entry(owner).or_insert_with(Stats::default);
+                stats.files += 1;
+
+                if stats.example.is_empty() {
+                    stats.example = format!("{:?} in {}", file, commit);
+                }
+            }
+        }
+
+        for owner in commit_owners {
+            summary.entry(owner).or_insert_with(Stats::default).commits += 1;
+        }
+
+        println!();
+    }
+
+    println!();
+    println!("Summary:");
+    let mut summary = summary.into_iter().collect::<Vec<_>>();
+    summary.sort_by_key(|(owner, _)| owner.to_string());
+
+    for (owner, stats) in summary {
+        println!(
+            " * {}: {} files in {} commits, including: {}",
+            owner, stats.files, stats.commits, stats.example
+        );
+    }
+
+    if unowned.files != 0 {
+        println!(
+            " * no owner: {} files, including: {}",
+            unowned.files, unowned.example
+        );
     }
 
     Ok(())
