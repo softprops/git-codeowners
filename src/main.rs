@@ -145,19 +145,26 @@ fn resolve(owners: &Owners, matches: &ArgMatches, path: &str) -> bool {
 }
 
 fn discover_codeowners() -> Option<PathBuf> {
-    let curr_dir = current_dir().unwrap();
-    let repo = match Repository::discover(&curr_dir) {
-        Ok(r) => r,
+    let curr_dir = match current_dir() {
+        Ok(dir) => dir,
         Err(e) => {
-            println!(
-                "Repo discovery failed. Is {} within a git repository? Error: {}",
-                curr_dir.display(),
-                e
-            );
+            eprintln!("error: couldn't find current directory: {:?}", e);
             return None;
         }
     };
 
-    let repo_root = repo.workdir().unwrap();
-    codeowners::locate(&repo_root)
+    match Repository::discover(&curr_dir) {
+        Ok(repo) => match repo.workdir() {
+            Some(path) => return codeowners::locate(path),
+            None => eprintln!("warning: bare repo has no files"),
+        },
+        Err(e) => {
+            eprintln!(
+                "warning: repo discovery failed. Is {:?} within a git repository? Error: {}",
+                curr_dir, e
+            );
+        }
+    };
+
+    codeowners::locate(&curr_dir)
 }
