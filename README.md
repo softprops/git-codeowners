@@ -40,8 +40,24 @@ $ cargo install git-codeowners
 git-codeowners is intended for use as a git extention ( a program whose name starts with git- ) to extend your git workflow.
 
 ```bash
-$ git codeowners src/main.rs
+$ git codeowners file src/main.rs
 @softprops
+```
+
+```bash
+$ git codeowners log origin/master..
+05a4fc chore: do the hokey cokey
+ * "Cargo.lock" @ops
+ * "Cargo.toml" @ops
+
+e5fe46 feat: Discover current repository
+ * "Cargo.lock" @ops
+ * "Cargo.toml" @ops
+ * "src/main.rs" @softprops
+
+Summary:
+ * @softprops: 1 file in 1 commit, including: "src/main.rs" in e5fe46 feat: Discover current repository
+ * @ops: 4 files in 2 commits, including: "src/main.rs" in 05a4fc chore: do the hokey cokey
 ```
 
 ```bash
@@ -50,7 +66,7 @@ git-codeowners 0.1.2
 Github CODEOWNERS answer sheet
 
 USAGE:
-    git-codeowners [FLAGS] [OPTIONS] <path>
+    git-codeowners [FLAGS] [OPTIONS] <SUBCOMMAND>
 
 FLAGS:
     -e, --emails     Only return emails
@@ -60,10 +76,13 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -c, --codeowners <codeowners>    An explicit path for a CODEOWNERS file. program will exit 1 if file can not be resolved
+    -c, --codeowners <codeowners>    An explicit path for a CODEOWNERS file. program will exit 1 if file can not be
+                                     resolved
 
-ARGS:
-    <path>    Path of file in git repo. if '-' is provided path will be read from stdin. program will exit 2 if no owners can be resolved
+SUBCOMMANDS:
+    help    Prints this message or the help of the given subcommand(s)
+    log     annotate log information
+    path    Finds information about a specific path or set of paths
 ```
 
 Doug Tangren (softprops) 2017
