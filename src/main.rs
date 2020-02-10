@@ -1,4 +1,4 @@
-use clap::{App, Arg, ArgMatches};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use codeowners::Owner;
 use codeowners::Owners;
 use git2::Repository;
@@ -22,6 +22,7 @@ fn run() -> Result<(), ExitError> {
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about("Github CODEOWNERS answer sheet")
+        .setting(clap::AppSettings::SubcommandRequiredElseHelp)
         .arg(
             Arg::with_name("codeowners")
                 .help("An explicit path for a CODEOWNERS file. program will exit 1 if file can not be resolved")
@@ -53,15 +54,18 @@ fn run() -> Result<(), ExitError> {
                 .conflicts_with("teams")
                 .conflicts_with("users"),
         )
-        .arg(
-            Arg::with_name("path")
-                .help(
-                    "Path of file in git repo. if '-' is provided path will \
-                     be read from stdin. program will exit 2 if no owners can \
-                     be resolved",
-                )
-                .index(1)
-                .required(true),
+        .subcommand(SubCommand::with_name("path")
+            .about("Finds information about a specific path or set of paths")
+            .arg(
+                Arg::with_name("path")
+                    .help(
+                        "Path of file in git repo. if '-' is provided path will \
+                         be read from stdin. program will exit 2 if no owners can \
+                         be resolved",
+                    )
+                    .index(1)
+                    .required(true)
+            )
         )
         .get_matches();
 
@@ -82,20 +86,23 @@ fn run() -> Result<(), ExitError> {
 
     let owners = codeowners::from_path(ownersfile);
 
-    match matches.value_of("path").unwrap().as_ref() {
-        "-" => {
-            let stdin = io::stdin();
-            for path in stdin.lock().lines().filter_map(Result::ok) {
-                if !resolve(&owners, &matches, &path) {
+    match matches.subcommand() {
+        ("path", Some(matches)) => match matches.value_of("path").unwrap().as_ref() {
+            "-" => {
+                let stdin = io::stdin();
+                for path in stdin.lock().lines().filter_map(Result::ok) {
+                    if !resolve(&owners, &matches, &path) {
+                        return Err((None, 2));
+                    }
+                }
+            }
+            path => {
+                if !resolve(&owners, &matches, path) {
                     return Err((None, 2));
                 }
             }
-        }
-        path => {
-            if !resolve(&owners, &matches, path) {
-                return Err((None, 2));
-            }
-        }
+        },
+        (_, _) => unreachable!("invalid subcommand"),
     }
 
     Ok(())
