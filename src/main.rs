@@ -57,17 +57,17 @@ fn run() -> i32 {
                 .required(true),
         )
         .get_matches();
+
     let ownersfile = match matches.value_of("codeowners") {
         Some(path) => {
             let p = Path::new(path);
-            if p.exists() {
-                Some(p.to_path_buf())
-            } else {
-                None
+            if !p.exists() {
+                return 1;
             }
+            p.to_path_buf()
         }
         None => match discover_codeowners() {
-            Some(path) => Some(path),
+            Some(path) => path,
             None => {
                 println!("No CODEOWNERS file found in this repo.");
                 println!("Ensure one exists at any of the locations documented here:");
@@ -77,10 +77,6 @@ fn run() -> i32 {
         },
     };
 
-    let ownersfile = match ownersfile {
-        Some(file) => file,
-        None => return 1,
-    };
     let owners = codeowners::from_path(ownersfile);
 
     match matches.value_of("path").unwrap().as_ref() {
