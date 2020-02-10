@@ -1,17 +1,17 @@
-extern crate clap;
-extern crate codeowners;
-extern crate git2;
-
-use clap::{App, Arg};
+use clap::{App, Arg, ArgMatches};
 use codeowners::Owner;
+use codeowners::Owners;
 use git2::Repository;
 use std::env::current_dir;
 use std::io::{self, BufRead};
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::exit;
 
 fn main() {
+    std::process::exit(run())
+}
+
+fn run() -> i32 {
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about("Github CODEOWNERS answer sheet")
@@ -72,66 +72,77 @@ fn main() {
                 println!("No CODEOWNERS file found in this repo.");
                 println!("Ensure one exists at any of the locations documented here:");
                 println!("https://help.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners#codeowners-file-location");
-                exit(1)
+                return 1;
             }
         },
     };
 
     match ownersfile {
         Some(file) => {
-            let resolve = |path: &str| {
-                let owners = codeowners::from_path(file.clone());
-                let (teams, users, emails) = (
-                    matches.occurrences_of("teams") > 0,
-                    matches.occurrences_of("users") > 0,
-                    matches.occurrences_of("emails") > 0,
-                );
-                match owners.of(path) {
-                    None => exit(2),
-                    Some(owners) => {
-                        let owned = owners
-                            .iter()
-                            .filter_map(|owner| {
-                                if teams {
-                                    match owner {
-                                        &Owner::Team(ref inner) => Some(inner.clone()),
-                                        _ => None,
-                                    }
-                                } else if users {
-                                    match owner {
-                                        &Owner::Username(ref inner) => Some(inner.clone()),
-                                        _ => None,
-                                    }
-                                } else if emails {
-                                    match owner {
-                                        &Owner::Email(ref inner) => Some(inner.clone()),
-                                        _ => None,
-                                    }
-                                } else {
-                                    Some(owner.to_string())
-                                }
-                            })
-                            .collect::<Vec<_>>();
-                        if owned.is_empty() {
-                            exit(2)
-                        } else {
-                            println!("{}", owned.join(" "));
-                        }
-                    }
-                }
-            };
+            let owners = codeowners::from_path(file.clone());
             match matches.value_of("path").unwrap().as_ref() {
                 "-" => {
                     let stdin = io::stdin();
                     for path in stdin.lock().lines().filter_map(Result::ok) {
-                        resolve(&path);
+                        if !resolve(&owners, &matches, &path) {
+                            return 2;
+                        }
                     }
                 }
-                path => resolve(path),
+                path => {
+                    if !resolve(&owners, &matches, path) {
+                        return 2;
+                    }
+                }
             }
         }
-        _ => exit(1),
+        _ => return 1,
     }
+
+    0
+}
+
+fn resolve(owners: &Owners, matches: &ArgMatches, path: &str) -> bool {
+    let (teams, users, emails) = (
+        matches.occurrences_of("teams") > 0,
+        matches.occurrences_of("users") > 0,
+        matches.occurrences_of("emails") > 0,
+    );
+    match owners.of(path) {
+        None => return false,
+        Some(owners) => {
+            let owned = owners
+                .iter()
+                .filter_map(|owner| {
+                    if teams {
+                        match owner {
+                            &Owner::Team(ref inner) => Some(inner.clone()),
+                            _ => None,
+                        }
+                    } else if users {
+                        match owner {
+                            &Owner::Username(ref inner) => Some(inner.clone()),
+                            _ => None,
+                        }
+                    } else if emails {
+                        match owner {
+                            &Owner::Email(ref inner) => Some(inner.clone()),
+                            _ => None,
+                        }
+                    } else {
+                        Some(owner.to_string())
+                    }
+                })
+                .collect::<Vec<_>>();
+            if owned.is_empty() {
+                return false;
+            } else {
+                println!("{}", owned.join(" "));
+            }
+        }
+    }
+
+    true
 }
 
 fn discover_codeowners() -> Option<PathBuf> {
@@ -144,7 +155,7 @@ fn discover_codeowners() -> Option<PathBuf> {
                 curr_dir.display(),
                 e
             );
-            exit(1)
+            return None;
         }
     };
 

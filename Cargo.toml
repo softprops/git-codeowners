@@ -10,6 +10,8 @@ repository = "https://github.com/softprops/git-codeowners"
 license = "MIT"
 keywords = ["github", "owners"]
 
+edition = "2018"
+
 [dependencies]
 codeowners = "0.1.3"
 clap = "2.27"
