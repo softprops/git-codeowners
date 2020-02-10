@@ -77,26 +77,26 @@ fn run() -> i32 {
         },
     };
 
-    match ownersfile {
-        Some(file) => {
-            let owners = codeowners::from_path(file.clone());
-            match matches.value_of("path").unwrap().as_ref() {
-                "-" => {
-                    let stdin = io::stdin();
-                    for path in stdin.lock().lines().filter_map(Result::ok) {
-                        if !resolve(&owners, &matches, &path) {
-                            return 2;
-                        }
-                    }
-                }
-                path => {
-                    if !resolve(&owners, &matches, path) {
-                        return 2;
-                    }
+    let ownersfile = match ownersfile {
+        Some(file) => file,
+        None => return 1,
+    };
+    let owners = codeowners::from_path(ownersfile);
+
+    match matches.value_of("path").unwrap().as_ref() {
+        "-" => {
+            let stdin = io::stdin();
+            for path in stdin.lock().lines().filter_map(Result::ok) {
+                if !resolve(&owners, &matches, &path) {
+                    return 2;
                 }
             }
         }
-        _ => return 1,
+        path => {
+            if !resolve(&owners, &matches, path) {
+                return 2;
+            }
+        }
     }
 
     0
@@ -108,38 +108,38 @@ fn resolve(owners: &Owners, matches: &ArgMatches, path: &str) -> bool {
         matches.occurrences_of("users") > 0,
         matches.occurrences_of("emails") > 0,
     );
-    match owners.of(path) {
+    let owners = match owners.of(path) {
+        Some(owners) => owners,
         None => return false,
-        Some(owners) => {
-            let owned = owners
-                .iter()
-                .filter_map(|owner| {
-                    if teams {
-                        match owner {
-                            &Owner::Team(ref inner) => Some(inner.clone()),
-                            _ => None,
-                        }
-                    } else if users {
-                        match owner {
-                            &Owner::Username(ref inner) => Some(inner.clone()),
-                            _ => None,
-                        }
-                    } else if emails {
-                        match owner {
-                            &Owner::Email(ref inner) => Some(inner.clone()),
-                            _ => None,
-                        }
-                    } else {
-                        Some(owner.to_string())
-                    }
-                })
-                .collect::<Vec<_>>();
-            if owned.is_empty() {
-                return false;
+    };
+    let owned = owners
+        .iter()
+        .filter_map(|owner| {
+            if teams {
+                match owner {
+                    &Owner::Team(ref inner) => Some(inner.clone()),
+                    _ => None,
+                }
+            } else if users {
+                match owner {
+                    &Owner::Username(ref inner) => Some(inner.clone()),
+                    _ => None,
+                }
+            } else if emails {
+                match owner {
+                    &Owner::Email(ref inner) => Some(inner.clone()),
+                    _ => None,
+                }
             } else {
-                println!("{}", owned.join(" "));
+                Some(owner.to_string())
             }
-        }
+        })
+        .collect::<Vec<_>>();
+
+    if owned.is_empty() {
+        return false;
+    } else {
+        println!("{}", owned.join(" "));
     }
 
     true
