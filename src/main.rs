@@ -1,7 +1,8 @@
 use clap::{App, Arg, ArgMatches, SubCommand};
 use codeowners::Owner;
 use codeowners::Owners;
-use git2::Repository;
+use git2::{Error, Repository};
+use std::collections::HashSet;
 use std::env::current_dir;
 use std::io::{self, BufRead};
 use std::path::Path;
@@ -67,6 +68,15 @@ fn run() -> Result<(), ExitError> {
                     .required(true)
             )
         )
+        .subcommand(SubCommand::with_name("log")
+            .about("annotate log information")
+            .arg(
+                Arg::with_name("revspec")
+                    .help("interesting commits, e.g. as HEAD~10, or develop..")
+                    .index(1)
+                    .multiple(true)
+                    .required(true)
+            ))
         .get_matches();
 
     let ownersfile = match matches.value_of("codeowners") {
@@ -102,6 +112,12 @@ fn run() -> Result<(), ExitError> {
                 }
             }
         },
+        ("log", Some(matches)) => {
+            let repo = Repository::discover(".").expect("dir");
+            for revspec in matches.values_of("revspec").expect("required") {
+                print_for_revspec(&repo, revspec).map_err(|e| (Some(format!("{:?}", e)), 1))?;
+            }
+        }
         (_, _) => unreachable!("invalid subcommand"),
     }
 
@@ -174,4 +190,33 @@ fn discover_codeowners() -> Option<PathBuf> {
     };
 
     codeowners::locate(&curr_dir)
+}
+
+fn print_for_revspec(repo: &git2::Repository, revspec: &str) -> Result<(), Error> {
+    let mut revwalk = repo.revwalk()?;
+    revwalk.push_range(revspec)?;
+    while let Some(commit) = revwalk.next() {
+        let commit = commit?;
+        let commit = repo.find_commit(commit).expect("commit");
+        let diff = repo
+            .diff_tree_to_tree(
+                Some(&commit.parent(0).expect("parent").tree().expect("tree")),
+                Some(&commit.tree().expect("tree")),
+                None,
+            )
+            .expect("diff");
+        let mut deltas = diff.deltas();
+        let mut files = HashSet::with_capacity(deltas.len());
+        while let Some(delta) = deltas.next() {
+            if let Some(path) = delta.new_file().path() {
+                files.insert(path.to_path_buf());
+            }
+            if let Some(path) = delta.old_file().path() {
+                files.insert(path.to_path_buf());
+            }
+        }
+        println!("{:?} touched files: {:?}", commit.id(), files);
+    }
+
+    Ok(())
 }
