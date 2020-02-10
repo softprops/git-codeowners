@@ -1,15 +1,15 @@
-extern crate codeowners;
 extern crate clap;
+extern crate codeowners;
 extern crate git2;
 
-use codeowners::Owner;
 use clap::{App, Arg};
+use codeowners::Owner;
 use git2::Repository;
 use std::env::current_dir;
+use std::io::{self, BufRead};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::exit;
-use std::io::{self, BufRead};
 
 fn main() {
     let matches = App::new(env!("CARGO_PKG_NAME"))
@@ -74,7 +74,7 @@ fn main() {
                 println!("https://help.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners#codeowners-file-location");
                 exit(1)
             }
-        }
+        },
     };
 
     match ownersfile {
@@ -91,23 +91,25 @@ fn main() {
                     Some(owners) => {
                         let owned = owners
                             .iter()
-                            .filter_map(|owner| if teams {
-                                match owner {
-                                    &Owner::Team(ref inner) => Some(inner.clone()),
-                                    _ => None,
+                            .filter_map(|owner| {
+                                if teams {
+                                    match owner {
+                                        &Owner::Team(ref inner) => Some(inner.clone()),
+                                        _ => None,
+                                    }
+                                } else if users {
+                                    match owner {
+                                        &Owner::Username(ref inner) => Some(inner.clone()),
+                                        _ => None,
+                                    }
+                                } else if emails {
+                                    match owner {
+                                        &Owner::Email(ref inner) => Some(inner.clone()),
+                                        _ => None,
+                                    }
+                                } else {
+                                    Some(owner.to_string())
                                 }
-                            } else if users {
-                                match owner {
-                                    &Owner::Username(ref inner) => Some(inner.clone()),
-                                    _ => None,
-                                }
-                            } else if emails {
-                                match owner {
-                                    &Owner::Email(ref inner) => Some(inner.clone()),
-                                    _ => None,
-                                }
-                            } else {
-                                Some(owner.to_string())
                             })
                             .collect::<Vec<_>>();
                         if owned.is_empty() {
@@ -130,7 +132,6 @@ fn main() {
         }
         _ => exit(1),
     }
-
 }
 
 fn discover_codeowners() -> Option<PathBuf> {
@@ -138,9 +139,13 @@ fn discover_codeowners() -> Option<PathBuf> {
     let repo = match Repository::discover(&curr_dir) {
         Ok(r) => r,
         Err(e) => {
-            println!("Repo discovery failed. Is {} within a git repository? Error: {}", curr_dir.display(), e);
+            println!(
+                "Repo discovery failed. Is {} within a git repository? Error: {}",
+                curr_dir.display(),
+                e
+            );
             exit(1)
-        },
+        }
     };
 
     let repo_root = repo.workdir().unwrap();
